@@ -9,6 +9,7 @@ import { Commonparams } from "../../lib/singi-bot-stack"
 import { StringParameter } from "aws-cdk-lib/aws-ssm"
 import { HttpApi, HttpMethod, HttpStage } from "aws-cdk-lib/aws-apigatewayv2"
 import { HttpLambdaIntegration } from "aws-cdk-lib/aws-apigatewayv2-integrations"
+import { Effect, PolicyStatement } from "aws-cdk-lib/aws-iam"
 
 export class WebHandler {
 
@@ -77,6 +78,14 @@ export class WebHandler {
                 SLACK_BOT_TOKEN: slackBotToken,
             },
         })
+        
+        // BedrockRuntimeのinvokeModelを呼び出すための権限を付与
+        const policy = new PolicyStatement({
+            effect: Effect.ALLOW,
+            actions: ["bedrock:InvokeModel"],
+            resources: ["*"]
+        })
+        func.addToRolePolicy(policy)
         
         func.addEventSourceMapping("SqsEventSource", {
             eventSourceArn: que.queueArn,
