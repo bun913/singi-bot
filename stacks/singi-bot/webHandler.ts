@@ -64,12 +64,18 @@ export class WebHandler {
         const funcName = `${this.prefix}-response`
         const entry = path.join(process.cwd(), "lambda","singiLambda.ts")
 
+        // parameterStoreから値を取得する
+        const slackBotToken = StringParameter.valueForStringParameter(this.construct, this.commonParams.slackBotToken)
+
         const func =  new NodejsFunction(this.construct, funcName, {
             entry,
             functionName: funcName,
             runtime: Runtime.NODEJS_LATEST,
             timeout: Duration.seconds(10),
-            logRetention: RetentionDays.ONE_DAY
+            logRetention: RetentionDays.ONE_DAY,
+            environment: {
+                SLACK_BOT_TOKEN: slackBotToken,
+            },
         })
         
         func.addEventSourceMapping("SqsEventSource", {

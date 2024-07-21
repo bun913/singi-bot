@@ -26,7 +26,10 @@ app.event("app_mention", async ({ event, context, client, say }) => {
       })
       .promise()
 
-    await say("審議中・・・")
+    await say({
+        text: "審議中・・・",
+        thread_ts: event.ts
+    })        
   } catch (error) {
     console.log(error)
     await say("エラーが発生しました")
