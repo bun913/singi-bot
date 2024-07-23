@@ -3,17 +3,25 @@ import type { AppMentionEvent } from "@slack/bolt"
 import { WebClient } from "@slack/web-api"
 import { BedrockRuntime } from '@aws-sdk/client-bedrock-runtime'
 import { orderMessage, rulePrompt } from "./constants"
+import { getParameter } from "./getSecret/getSecret"
 
+let token: string
+let slackClient: WebClient
+let bedrockClient: BedrockRuntime
 
-const token = process.env.SLACK_BOT_TOKEN || ""
-const slackClient = new WebClient(token)
-const bedrockClient = new BedrockRuntime({
-  region: process.env.AWS_REGION || "us-east-1",
-})
+const initialize = async () => {
+  token = await getParameter(process.env.SLACK_BOT_TOKEN_PARAM || "")
+  slackClient = new WebClient(token)
+  bedrockClient = new BedrockRuntime({
+    region: process.env.AWS_REGION || "us-east-1",
+  })
+}
 
 export async function handler(event: SQSEvent, context: any): Promise<void> {
   const now = new Date().toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })
   try {
+    // 初期化
+    await initialize()
     // イベントから必要な情報を取得
     const slackEventStr = event.Records[0].body
     const body = JSON.parse(slackEventStr) as any

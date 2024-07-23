@@ -18,7 +18,7 @@ export class ManuallyManagedResourceStack extends cdk.Stack {
     // Create Parameter Store and manage it manually
     const slackSigninSecret = new StringParameter(this, "slackSigninSecret", {
       parameterName: commonParams.slackSigninSecret,
-      stringValue: commonParams.dummyString
+      stringValue: commonParams.dummyString,
     })
     
     // Create Parameter Store and manage it manually

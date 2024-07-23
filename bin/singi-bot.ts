@@ -8,14 +8,16 @@ import {
 
 const app = new cdk.App()
 
+export const region = "us-east-1"
+
 new ManuallyManagedResourceStack(app, "SingiBot-ManuallyManagedResourceStack", {
   env: {
-    region: "us-east-1",
+    region
   },
 })
 
 new SingiBotStack(app, "SingiBotStack", {
   env: {
-    region: "us-east-1",
+    region
   },
 })
