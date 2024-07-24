@@ -6,7 +6,8 @@ import { StringParameter } from 'aws-cdk-lib/aws-ssm';
 const commonParams = {
   slackSigninSecret: "/singi-bot/slackSigninSecret",
   slackBotToken: "/singi-bot/slackBotToken",
-  dummyString: "dummy"
+  dummyString: "dummy",
+  messageTableName: "slackChatGptBotNode-messages",
 }
 
 export type Commonparams = typeof commonParams
@@ -26,6 +27,27 @@ export class ManuallyManagedResourceStack extends cdk.Stack {
       parameterName: commonParams.slackBotToken,
       stringValue: commonParams.dummyString
     })
+    
+    // Create DynamoDB
+    const messagesTable = new cdk.aws_dynamodb.Table(this, "messagesTable", {
+      tableName: commonParams.messageTableName,
+      partitionKey: {
+        name: "id",
+        type: cdk.aws_dynamodb.AttributeType.STRING,
+      },
+      billingMode: cdk.aws_dynamodb.BillingMode.PAY_PER_REQUEST,
+      // TODO: 本番環境ではDESTROYを使わない
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      encryption: cdk.aws_dynamodb.TableEncryption.AWS_MANAGED,
+    });
+
+    messagesTable.addGlobalSecondaryIndex({
+      indexName: "threadTsIndex",
+      partitionKey: {
+        name: "threadTs",
+        type: cdk.aws_dynamodb.AttributeType.STRING,
+      },
+    });
   }
 }
 

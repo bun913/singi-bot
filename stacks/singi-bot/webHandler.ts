@@ -11,10 +11,11 @@ import { Duration } from "aws-cdk-lib"
 import { Queue } from "aws-cdk-lib/aws-sqs"
 import { RetentionDays } from "aws-cdk-lib/aws-logs"
 import { Commonparams } from "../../lib/singi-bot-stack"
-import { HttpApi, HttpMethod} from "aws-cdk-lib/aws-apigatewayv2"
+import { HttpApi, HttpMethod } from "aws-cdk-lib/aws-apigatewayv2"
 import { HttpLambdaIntegration } from "aws-cdk-lib/aws-apigatewayv2-integrations"
 import { Effect, PolicyStatement } from "aws-cdk-lib/aws-iam"
 import { StringParameter } from "aws-cdk-lib/aws-ssm"
+import { ITable, Table } from "aws-cdk-lib/aws-dynamodb"
 
 export class WebHandler {
   readonly prefix: string
@@ -22,6 +23,7 @@ export class WebHandler {
   readonly commonParams: Commonparams
 
   readonly lamdaExtension: ParamsAndSecretsLayerVersion
+  readonly messageTable: ITable
   readonly inqueLambda: NodejsFunction
   readonly responseLambda: NodejsFunction
   readonly api: HttpApi
@@ -38,6 +40,7 @@ export class WebHandler {
 
     this.que = this.createQue()
     this.lamdaExtension = this.getLambdaExtension()
+    this.messageTable = this.getDynamoDBTable()
     this.inqueLambda = this.crearteInqueLambda()
     this.responseLambda = this.createResponseLambda()
     this.api = this.createGateway()
@@ -57,6 +60,14 @@ export class WebHandler {
         cacheSize: 500,
         logLevel: ParamsAndSecretsLogLevel.INFO,
       }
+    )
+  }
+
+  private getDynamoDBTable(): ITable {
+    return Table.fromTableName(
+      this.construct,
+      "messagesTable",
+      this.commonParams.messageTableName
     )
   }
 
@@ -134,14 +145,29 @@ export class WebHandler {
     })
     this.responseLambda.addToRolePolicy(policy)
     // Lambdaに SSM ParameterStoreへのアクセス権限を付与
-    const slackSigninSecretParam = StringParameter.fromStringParameterAttributes(this.construct, "slackSigninSecretParam", {
-        parameterName: this.commonParams.slackSigninSecret,
-    })
-    const slackBotTokenParam = StringParameter.fromStringParameterAttributes(this.construct, "slackBotTokenParam", {
+    const slackSigninSecretParam =
+      StringParameter.fromStringParameterAttributes(
+        this.construct,
+        "slackSigninSecretParam",
+        {
+          parameterName: this.commonParams.slackSigninSecret,
+        }
+      )
+    const slackBotTokenParam = StringParameter.fromStringParameterAttributes(
+      this.construct,
+      "slackBotTokenParam",
+      {
         parameterName: this.commonParams.slackBotToken,
-    })
+      }
+    )
+    
+
     slackSigninSecretParam.grantRead(this.inqueLambda)
     slackBotTokenParam.grantRead(this.inqueLambda)
     slackBotTokenParam.grantRead(this.responseLambda)
+    
+    this.messageTable.grantReadWriteData(this.inqueLambda)
+    this.messageTable.grantReadData(this.responseLambda)
+
   }
 }
