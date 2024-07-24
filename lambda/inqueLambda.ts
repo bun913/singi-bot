@@ -3,12 +3,22 @@ import { SQS } from "aws-sdk";
 import { App, AwsLambdaReceiver } from "@slack/bolt";
 import { Context, Callback } from "aws-lambda";
 import { getParameter } from "./getSecret/getSecret";
+import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { region } from "../bin/singi-bot";
+import { saveMessage, SaveMessage } from "./db/query";
 
 const sqs = new SQS();
 const queUrl = process.env.QUE_URL || "";
 
 let awsLambdaReceiver: AwsLambdaReceiver | null = null;
 let app: App | null = null;
+// const ddbDocClient = DynamoDBDocumentClient.from(
+//   new DynamoDBClient({
+//     region,
+//   })
+// )
+
 
 const initializeApp = async () => {
   if (awsLambdaReceiver && app) {
@@ -30,15 +40,26 @@ const initializeApp = async () => {
 
   app.event("app_mention", async ({ event, context, client, say }) => {
     try {
+      // キューにメッセージを送信
       await sqs.sendMessage({
         QueueUrl: queUrl,
         MessageBody: JSON.stringify({ event }),
       }).promise();
+      
+      // スレッドの発言履歴を保存する
+      // const message: SaveMessage = {
+      //   clientMsgId: event.client_msg_id || "",
+      //   content: event.text,
+      //   threadTs: event.thread_ts || "",
+      // }
+      // await saveMessage(ddbDocClient, message)
 
-      await say({
-        text: "審議中・・・",
-        thread_ts: event.ts,
-      });
+      // リアクションをつけて考えていることを伝える
+      await client.reactions.add({
+        name: "+1",
+        channel: event.channel,
+        timestamp: event.ts
+      })
     } catch (error) {
       console.log(error);
       await say("エラーが発生しました");
