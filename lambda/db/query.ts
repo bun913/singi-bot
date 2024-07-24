@@ -11,14 +11,12 @@ import utc from "dayjs/plugin/utc"
 import advancedFormat from "dayjs/plugin/advancedFormat"
 import { orderBy } from "lodash-es"
 import type { MessageDdbItem } from "./schema"
-import { region } from "../../bin/singi-bot"
 
 dayjs.extend(utc)
 dayjs.extend(advancedFormat)
 
 const nanoSecondFormat = "YYYY-MM-DDTHH:mm:ss.SSSSSSSSS[Z]"
 
-const messagesTableName = process.env["MESSAGES_TABLE_NAME"] ?? ""
 const threadTsIndexName = "threadTsIndex"
 
 export interface SaveMessage {
@@ -31,11 +29,12 @@ export type Message = Record<string, any>
 
 export const saveMessage = async (
   ddbDocClient: DynamoDBDocumentClient,
+  tableName: string,
   saveMessage: SaveMessage
 ) => {
   await ddbDocClient.send(
     new PutCommand({
-      TableName: messagesTableName,
+      TableName: tableName,
       Item: {
         id: `${saveMessage.clientMsgId}#user`,
         content: trimMention(saveMessage.content),
@@ -54,12 +53,13 @@ export const trimMention = (content: string) => {
 
 export const getHistories = async (
   ddbDocClient: DynamoDBDocumentClient,
+  tableName: string,
   threadTs: string
 ): Promise<Record<string, any>[]> => {
   // 会話中ユーザのこれまでの発言履歴を取得する
   const { Items: messages = [] } = await ddbDocClient.send(
     new QueryCommand({
-      TableName: messagesTableName,
+      TableName: tableName,
       IndexName: threadTsIndexName,
       KeyConditionExpression: "#threadTs = :threadTs",
       ExpressionAttributeNames: {
@@ -73,14 +73,18 @@ export const getHistories = async (
   return messages
 }
 
-export const delUnneseccaryMessages = async (ddbDocClient: DynamoDBDocumentClient,messages: Message[]) => {
+export const delUnneseccaryMessages = async (
+  ddbDocClient: DynamoDBDocumentClient,
+  tableName: string,
+  messages: Message[]
+) => {
   const orderedMessages = sortByTimeStamp(messages)
   const resentMessages = orderedMessages.splice(-10)
   await Promise.all(
     orderedMessages.map((message) =>
       ddbDocClient.send(
         new DeleteCommand({
-          TableName: messagesTableName,
+          TableName: tableName,
           Key: {
             id: message["id"],
           },

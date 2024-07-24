@@ -80,10 +80,12 @@ export class WebHandler {
       functionName: funcName,
       runtime: Runtime.NODEJS_20_X,
       timeout: Duration.seconds(10),
+      memorySize: 1024,
       environment: {
         QUE_URL: this.que.queueUrl,
         SLACK_BOT_TOKEN_PARAM: this.commonParams.slackBotToken,
         SLACK_SIGNING_SECRET_PARAM: this.commonParams.slackSigninSecret,
+        MESSAGE_TABLE_NAME: this.commonParams.messageTableName,
       },
       paramsAndSecrets: this.lamdaExtension,
       // TODO: log保存期間と保存場所を変更する
@@ -105,6 +107,7 @@ export class WebHandler {
       environment: {
         SLACK_BOT_TOKEN_PARAM: this.commonParams.slackBotToken,
         SLACK_SIGNING_SECRET_PARAM: this.commonParams.slackSigninSecret,
+        MESSAGE_TABLE_NAME: this.commonParams.messageTableName,
       },
       paramsAndSecrets: this.lamdaExtension,
     })
