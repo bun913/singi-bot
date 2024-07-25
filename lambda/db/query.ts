@@ -1,5 +1,4 @@
 // server/src/handler.ts
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb"
 import {
   DeleteCommand,
   DynamoDBDocumentClient,
