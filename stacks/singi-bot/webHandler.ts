@@ -8,13 +8,13 @@ import {
   Runtime,
 } from "aws-cdk-lib/aws-lambda"
 import { Duration } from "aws-cdk-lib"
-import { Queue } from "aws-cdk-lib/aws-sqs"
 import { RetentionDays } from "aws-cdk-lib/aws-logs"
 import { Commonparams } from "../../lib/singi-bot-stack"
-import { HttpApi, HttpMethod} from "aws-cdk-lib/aws-apigatewayv2"
+import { HttpApi, HttpMethod } from "aws-cdk-lib/aws-apigatewayv2"
 import { HttpLambdaIntegration } from "aws-cdk-lib/aws-apigatewayv2-integrations"
 import { Effect, PolicyStatement } from "aws-cdk-lib/aws-iam"
 import { StringParameter } from "aws-cdk-lib/aws-ssm"
+import { ITable, ITableV2, TableV2 } from "aws-cdk-lib/aws-dynamodb"
 
 export class WebHandler {
   readonly prefix: string
@@ -22,10 +22,9 @@ export class WebHandler {
   readonly commonParams: Commonparams
 
   readonly lamdaExtension: ParamsAndSecretsLayerVersion
-  readonly inqueLambda: NodejsFunction
-  readonly responseLambda: NodejsFunction
+  readonly messageTable: ITable
+  readonly lambdaFunc: NodejsFunction
   readonly api: HttpApi
-  readonly que: Queue
 
   constructor(
     prefix: string,
@@ -36,18 +35,11 @@ export class WebHandler {
     this.construct = construct
     this.commonParams = commonparams
 
-    this.que = this.createQue()
     this.lamdaExtension = this.getLambdaExtension()
-    this.inqueLambda = this.crearteInqueLambda()
-    this.responseLambda = this.createResponseLambda()
+    this.messageTable = this.getDynamoDBTable()
+    this.lambdaFunc = this.crearteLambda()
     this.api = this.createGateway()
     this.grant()
-  }
-
-  private createQue(): Queue {
-    return new Queue(this.construct, `${this.prefix}-que`, {
-      queueName: `${this.prefix}-que`,
-    })
   }
 
   private getLambdaExtension(): ParamsAndSecretsLayerVersion {
@@ -60,55 +52,39 @@ export class WebHandler {
     )
   }
 
-  private crearteInqueLambda(): NodejsFunction {
+  private getDynamoDBTable(): ITableV2 {
+    return TableV2.fromTableName(
+      this.construct,
+      "messagesTable",
+      this.commonParams.messageTableName
+    )
+  }
+
+  private crearteLambda(): NodejsFunction {
     const funcName = `${this.prefix}-inque`
-    const entry = path.join(process.cwd(), "lambda", "inqueLambda.ts")
+    const entry = path.join(process.cwd(), "lambda", "lambda.ts")
 
     return new NodejsFunction(this.construct, funcName, {
       entry,
       functionName: funcName,
       runtime: Runtime.NODEJS_20_X,
       timeout: Duration.seconds(10),
+      memorySize: 2056,
       environment: {
-        QUE_URL: this.que.queueUrl,
         SLACK_BOT_TOKEN_PARAM: this.commonParams.slackBotToken,
         SLACK_SIGNING_SECRET_PARAM: this.commonParams.slackSigninSecret,
+        MESSAGE_TABLE_NAME: this.commonParams.messageTableName,
       },
       paramsAndSecrets: this.lamdaExtension,
       // TODO: log保存期間と保存場所を変更する
       logRetention: RetentionDays.ONE_DAY,
     })
-  }
-
-  private createResponseLambda(): NodejsFunction {
-    const funcName = `${this.prefix}-response`
-    const entry = path.join(process.cwd(), "lambda", "singiLambda.ts")
-
-    const func = new NodejsFunction(this.construct, funcName, {
-      entry,
-      functionName: funcName,
-      runtime: Runtime.NODEJS_20_X,
-      timeout: Duration.seconds(10),
-      // TODO: log保存期間と保存場所を変更する
-      logRetention: RetentionDays.ONE_DAY,
-      environment: {
-        SLACK_BOT_TOKEN_PARAM: this.commonParams.slackBotToken,
-        SLACK_SIGNING_SECRET_PARAM: this.commonParams.slackSigninSecret,
-      },
-      paramsAndSecrets: this.lamdaExtension,
-    })
-
-    func.addEventSourceMapping("SqsEventSource", {
-      eventSourceArn: this.que.queueArn,
-    })
-
-    return func
   }
 
   private createGateway(): HttpApi {
     const httpLambdaIntegRation = new HttpLambdaIntegration(
       `${this.prefix}-integ`,
-      this.inqueLambda
+      this.lambdaFunc
     )
     const api = new HttpApi(this.construct, `${this.prefix}-gateway`, {
       apiName: `${this.prefix}-gateway`,
@@ -123,25 +99,43 @@ export class WebHandler {
   }
 
   private grant() {
-    // Lambda <=> Que間の権限を付与
-    this.que.grantConsumeMessages(this.responseLambda)
-    this.que.grantSendMessages(this.inqueLambda)
     // BedrockRuntimeのinvokeModelを呼び出すための権限を付与
     const policy = new PolicyStatement({
       effect: Effect.ALLOW,
       actions: ["bedrock:InvokeModel"],
       resources: ["*"],
     })
-    this.responseLambda.addToRolePolicy(policy)
+    this.lambdaFunc.addToRolePolicy(policy)
     // Lambdaに SSM ParameterStoreへのアクセス権限を付与
-    const slackSigninSecretParam = StringParameter.fromStringParameterAttributes(this.construct, "slackSigninSecretParam", {
-        parameterName: this.commonParams.slackSigninSecret,
-    })
-    const slackBotTokenParam = StringParameter.fromStringParameterAttributes(this.construct, "slackBotTokenParam", {
+    const slackSigninSecretParam =
+      StringParameter.fromStringParameterAttributes(
+        this.construct,
+        "slackSigninSecretParam",
+        {
+          parameterName: this.commonParams.slackSigninSecret,
+        }
+      )
+    const slackBotTokenParam = StringParameter.fromStringParameterAttributes(
+      this.construct,
+      "slackBotTokenParam",
+      {
         parameterName: this.commonParams.slackBotToken,
-    })
-    slackSigninSecretParam.grantRead(this.inqueLambda)
-    slackBotTokenParam.grantRead(this.inqueLambda)
-    slackBotTokenParam.grantRead(this.responseLambda)
+      }
+    )
+    
+
+    slackSigninSecretParam.grantRead(this.lambdaFunc)
+    slackBotTokenParam.grantRead(this.lambdaFunc)
+    
+    this.messageTable.grantReadWriteData(this.lambdaFunc)
+    const indexPolicy = new PolicyStatement({
+      effect: Effect.ALLOW,
+      actions: ["dynamodb:Query"],
+      resources: [
+        `${this.messageTable.tableArn}/index/*`,
+      ],
+    });
+    
+    this.lambdaFunc.addToRolePolicy(indexPolicy);
   }
 }
