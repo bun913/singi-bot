@@ -4,10 +4,18 @@ import { WebClient } from "@slack/web-api"
 import { BedrockRuntime } from '@aws-sdk/client-bedrock-runtime'
 import { orderMessage, rulePrompt } from "./constants"
 import { getParameter } from "./getSecret/getSecret"
+import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb"
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb"
+import { getHistories, saveMessage, SaveMessage } from "./db/query"
 
 let token: string
 let slackClient: WebClient
 let bedrockClient: BedrockRuntime
+const ddbDocClient = DynamoDBDocumentClient.from(
+  new DynamoDBClient({
+    region: "us-east-1",
+  })
+)
 
 const initialize = async () => {
   token = await getParameter(process.env.SLACK_BOT_TOKEN_PARAM || "")
@@ -27,6 +35,11 @@ export async function handler(event: SQSEvent, context: any): Promise<void> {
     const body = JSON.parse(slackEventStr) as any
     const slackEvent = body.event as AppMentionEvent
     const threadTs = slackEvent.thread_ts || slackEvent.ts;
+    
+    // ユーザーの発言履歴を保存
+    const tableName = process.env.MESSAGE_TABLE_NAME || ""
+    const messages = await getHistories(ddbDocClient, tableName || "", threadTs)
+    console.log(messages)
     
     // 厳正なる審議
     const judgeResult = await singi(bedrockClient, slackEvent.text)

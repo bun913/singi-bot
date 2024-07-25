@@ -15,7 +15,7 @@ import { HttpApi, HttpMethod } from "aws-cdk-lib/aws-apigatewayv2"
 import { HttpLambdaIntegration } from "aws-cdk-lib/aws-apigatewayv2-integrations"
 import { Effect, PolicyStatement } from "aws-cdk-lib/aws-iam"
 import { StringParameter } from "aws-cdk-lib/aws-ssm"
-import { ITable, Table } from "aws-cdk-lib/aws-dynamodb"
+import { ITable, ITableV2, TableV2 } from "aws-cdk-lib/aws-dynamodb"
 
 export class WebHandler {
   readonly prefix: string
@@ -63,8 +63,8 @@ export class WebHandler {
     )
   }
 
-  private getDynamoDBTable(): ITable {
-    return Table.fromTableName(
+  private getDynamoDBTable(): ITableV2 {
+    return TableV2.fromTableName(
       this.construct,
       "messagesTable",
       this.commonParams.messageTableName
@@ -102,6 +102,7 @@ export class WebHandler {
       functionName: funcName,
       runtime: Runtime.NODEJS_20_X,
       timeout: Duration.seconds(10),
+      memorySize: 1024,
       // TODO: log保存期間と保存場所を変更する
       logRetention: RetentionDays.ONE_DAY,
       environment: {
@@ -170,7 +171,17 @@ export class WebHandler {
     slackBotTokenParam.grantRead(this.responseLambda)
     
     this.messageTable.grantReadWriteData(this.inqueLambda)
-    this.messageTable.grantReadData(this.responseLambda)
-
+    this.messageTable.grantReadWriteData(this.responseLambda)
+    const indexPolicy = new PolicyStatement({
+      effect: Effect.ALLOW,
+      actions: ["dynamodb:Query"],
+      resources: [
+        `${this.messageTable.tableArn}/index/*`,
+      ],
+    });
+    
+    this.inqueLambda.addToRolePolicy(indexPolicy);
+    this.responseLambda.addToRolePolicy(indexPolicy);
+    this.responseLambda.addToRolePolicy(indexPolicy)
   }
 }
