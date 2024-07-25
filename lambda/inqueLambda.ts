@@ -43,19 +43,19 @@ const initializeApp = async () => {
 
   app.event("app_mention", async ({ event, context, client, say }) => {
     try {
-      // キューにメッセージを送信
-      await sqs.sendMessage({
-        QueueUrl: queUrl,
-        MessageBody: JSON.stringify({ event }),
-      })
-
       // スレッドの発言履歴を保存する
       const message: SaveMessage = {
         clientMsgId: event.client_msg_id || "",
         content: event.text,
         threadTs: event.thread_ts || event.ts,
       }
-      await saveMessage(ddbDocClient, tableName, message)
+      await saveMessage(ddbDocClient, tableName, message, "user")
+
+      // キューにメッセージを送信
+      await sqs.sendMessage({
+        QueueUrl: queUrl,
+        MessageBody: JSON.stringify({ event }),
+      })
 
       // リアクションをつけて考えていることを伝える
       await client.reactions.add({
@@ -65,7 +65,7 @@ const initializeApp = async () => {
       })
     } catch (error) {
       console.log(error)
-      await say("エラーが発生しました")
+      await say("エラーが発生しました。申し訳ありませんが新しくスレッドを立ててくだされ")
     }
   })
 }

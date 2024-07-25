@@ -102,7 +102,7 @@ export class WebHandler {
       functionName: funcName,
       runtime: Runtime.NODEJS_20_X,
       timeout: Duration.seconds(10),
-      memorySize: 1024,
+      memorySize: 2056,
       // TODO: log保存期間と保存場所を変更する
       logRetention: RetentionDays.ONE_DAY,
       environment: {

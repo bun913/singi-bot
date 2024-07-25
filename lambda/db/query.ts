@@ -30,17 +30,18 @@ export type Message = Record<string, any>
 export const saveMessage = async (
   ddbDocClient: DynamoDBDocumentClient,
   tableName: string,
-  saveMessage: SaveMessage
+  saveMessage: SaveMessage,
+  role: "user" | "system" | "assistant" = "user"
 ) => {
-  await ddbDocClient.send(
+  return await ddbDocClient.send(
     new PutCommand({
       TableName: tableName,
       Item: {
-        id: `${saveMessage.clientMsgId}#user`,
+        id: `${saveMessage.clientMsgId}#${role}`,
         content: trimMention(saveMessage.content),
         threadTs: saveMessage.threadTs,
         saidAt: dayjs().format(nanoSecondFormat),
-        role: "user",
+        role,
       } satisfies MessageDdbItem,
     })
   )
@@ -79,7 +80,8 @@ export const delUnneseccaryMessages = async (
   messages: Message[]
 ) => {
   const orderedMessages = sortByTimeStamp(messages)
-  const resentMessages = orderedMessages.splice(-10)
+  // 11件以上のメッセージがある場合は古いメッセージを削除する
+  const resentMessages = orderedMessages.splice(-11)
   await Promise.all(
     orderedMessages.map((message) =>
       ddbDocClient.send(
