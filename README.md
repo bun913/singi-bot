@@ -1,14 +1,16 @@
-# Welcome to your CDK TypeScript project
+# Welcome to AI Chatbot Sample Project
 
-This is a blank project for CDK development with TypeScript.
+![Architecture](./Architecture.drawio.svg)
 
-The `cdk.json` file tells the CDK Toolkit how to execute your app.
+## Overview
 
-## Useful commands
+This project is a sample project to demonstrate how to build a chatbot using AWS services. The chatbot is built using Amazon Bedrock and AWS Lambda.
 
-* `npm run build`   compile typescript to js
-* `npm run watch`   watch for changes and compile
-* `npm run test`    perform the jest unit tests
-* `npx cdk deploy`  deploy this stack to your default AWS account/region
-* `npx cdk diff`    compare deployed stack with current state
-* `npx cdk synth`   emits the synthesized CloudFormation template
+In this project, we are using DynamoDB to store the past conversation history, so that the AI can provide context-appropriate responses. 
+
+## Setup
+
+* `cdk deploy SingiBot-ManuallyManagedResourceStack` 
+* set slack token and slack signing secret in to SSM parameter store.
+  * FIY: [Amazon BedrockとSlackで生成AIチャットボットアプリを作る (その2：Lambda＋API Gatewayで動かす) | DevelopersIO](https://dev.classmethod.jp/articles/amazon-bedrock-slack-chat-bot-part2/#%25E6%2589%258B%25E9%25A0%2586(1)%2520Slack%25E5%2581%25B4%25E3%2581%25AE%25E8%25A8%25AD%25E5%25AE%259A)
+* `cdk deploy SingiBot-Stack`
