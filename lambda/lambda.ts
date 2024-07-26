@@ -66,6 +66,12 @@ const initializeApp = async () => {
         return
       }
 
+      // Reponse once to the user
+      const saidMessage = await say({
+        text: "うむ、我が主よ。しばし待たれよ。",
+        thread_ts: threadTs,
+      })
+
       // Save message history
       try {
         await saveMessage(ddbDocClient, tableName, message, "user")
@@ -151,10 +157,11 @@ const initializeApp = async () => {
 
       // Respond in thread
       try {
-        await client.chat.postMessage({
+        // Edit the response
+        await client.chat.update({
           channel: event.channel,
+          ts: saidMessage.ts || "",
           text: judgeResult,
-          thread_ts: threadTs,
         })
         logger.info({ message: "Responded to thread with AI response" })
       } catch (error) {
@@ -166,19 +173,7 @@ const initializeApp = async () => {
         message: "An error occurred during message processing",
         error,
       })
-      // Save error message in thread
-      const saveMessageContent: SaveMessage = {
-        clientMsgId: event.client_msg_id || "",
-        content: "An error occurred. Please start a new thread.",
-        threadTs,
-      }
       try {
-        await saveMessage(
-          ddbDocClient,
-          tableName,
-          saveMessageContent,
-          "assistant"
-        )
         await client.chat.postMessage({
           channel: event.channel,
           text: "An error occurred. Please start a new thread.",
