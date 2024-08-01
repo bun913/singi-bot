@@ -51,7 +51,48 @@ const initializeApp = async () => {
   })
 
   app.event("app_mention", async ({ event, logger, context, client, say }) => {
+    const limitedUser = process.env.LIMITED_USER || ""
+    const limitedChannel = process.env.LIMITED_CHANNEL || ""
     const threadTs = event.thread_ts || event.ts
+
+    // Output Access Log
+    await logger.info({
+      type: "access",
+      user: event.user || "",
+      text: event.text,
+      channel: event.channel,
+      msgId: event.client_msg_id || "",
+      threadTs,
+    })
+
+    // if user is limited
+    if (limitedUser && limitedUser !== event.user) {
+      await logger.info({
+        type: "limitedUserAccess",
+        user: event.user || "",
+        channel: event.channel,
+      })
+      await say({
+        text: "Sorry, user is limited. I can't respond to you.",
+        thread_ts: event.ts,
+      })
+      return
+    }
+
+    // if channel is limited
+    if (limitedChannel && limitedChannel !== event.channel) {
+      await logger.info({
+        type: "limitedChannelAccess",
+        user: event.user || "",
+        channel: event.channel,
+      })
+      await say({
+        text: "Sorry, channel is limited. I can't respond to you.",
+        thread_ts: event.ts,
+      })
+      return
+    }
+
     const message: SaveMessage = {
       clientMsgId: event.client_msg_id || "",
       content: event.text,
@@ -65,16 +106,6 @@ const initializeApp = async () => {
         })
         return
       }
-      
-      // Output Access Log
-      await logger.info({
-        type: "access",
-        user: event.user || "",
-        text: event.text,
-        channel: event.channel,
-        msgId: event.client_msg_id || "",
-        threadTs
-      })
 
       // Reponse once to the user
       const saidMessage = await say({
@@ -85,9 +116,16 @@ const initializeApp = async () => {
       // Save message history
       try {
         await saveMessage(ddbDocClient, tableName, message, "user")
-        await logger.info({ message: "User message saved successfully", type:"saveUserMessage" })
+        await logger.info({
+          message: "User message saved successfully",
+          type: "saveUserMessage",
+        })
       } catch (error) {
-        await logger.error({ message: "Error saving user message", error,type:"saveUserMessage" })
+        await logger.error({
+          message: "Error saving user message",
+          error,
+          type: "saveUserMessage",
+        })
         throw error
       }
 
@@ -95,9 +133,16 @@ const initializeApp = async () => {
       let messages
       try {
         messages = await getHistories(ddbDocClient, tableName, threadTs)
-        await logger.info({ message: "Retrieved message history",type:"getHistory" })
+        await logger.info({
+          message: "Retrieved message history",
+          type: "getHistory",
+        })
       } catch (error) {
-        await logger.error({ message: "Error retrieving message history", error, type:"getHistory" })
+        await logger.error({
+          message: "Error retrieving message history",
+          error,
+          type: "getHistory",
+        })
         throw error
       }
 
@@ -109,9 +154,16 @@ const initializeApp = async () => {
           tableName,
           messages
         )
-        await logger.info({ message: "Cleaned unnecessary messages", type:"delMessage" })
+        await logger.info({
+          message: "Cleaned unnecessary messages",
+          type: "delMessage",
+        })
       } catch (error) {
-        await logger.error({ message: "Error cleaning unnecessary messages", error, type:"delMessage" })
+        await logger.error({
+          message: "Error cleaning unnecessary messages",
+          error,
+          type: "delMessage",
+        })
         throw error
       }
 
@@ -130,9 +182,16 @@ const initializeApp = async () => {
             ],
           })
         )
-        await logger.info({ message: "Messages formatted for AI", type: "formatMessages" })
+        await logger.info({
+          message: "Messages formatted for AI",
+          type: "formatMessages",
+        })
       } catch (error) {
-        await logger.error({ message: "Error formatting messages for AI", error,type: "formatMessages" })
+        await logger.error({
+          message: "Error formatting messages for AI",
+          error,
+          type: "formatMessages",
+        })
         throw error
       }
 
@@ -140,9 +199,16 @@ const initializeApp = async () => {
       let judgeResult
       try {
         judgeResult = await singi(bedrockClient, formattedMessages)
-        await logger.info({ message: "Received AI response", type: "AIResponse" })
+        await logger.info({
+          message: "Received AI response",
+          type: "AIResponse",
+        })
       } catch (error) {
-        await logger.error({ message: "Error in AI processing", error, type: "AIResponse" })
+        await logger.error({
+          message: "Error in AI processing",
+          error,
+          type: "AIResponse",
+        })
         throw error
       }
 
@@ -159,9 +225,16 @@ const initializeApp = async () => {
           saveMessageContent,
           "assistant"
         )
-        await logger.info({ message: "AI response saved successfully",type: "saveAIResponse" })
+        await logger.info({
+          message: "AI response saved successfully",
+          type: "saveAIResponse",
+        })
       } catch (error) {
-        await logger.error({ message: "Error saving AI response", error,type: "saveAIResponse" })
+        await logger.error({
+          message: "Error saving AI response",
+          error,
+          type: "saveAIResponse",
+        })
         throw error
       }
 
@@ -173,9 +246,16 @@ const initializeApp = async () => {
           ts: saidMessage.ts || "",
           text: judgeResult,
         })
-        await logger.info({ message: "Responded to thread with AI response", type:"editChatMessage" })
+        await logger.info({
+          message: "Responded to thread with AI response",
+          type: "editChatMessage",
+        })
       } catch (error) {
-        await logger.error({ message: "Error responding in thread", error, type:"editChatMessage" })
+        await logger.error({
+          message: "Error responding in thread",
+          error,
+          type: "editChatMessage",
+        })
         throw error
       }
     } catch (error) {
