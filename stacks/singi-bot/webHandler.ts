@@ -61,14 +61,14 @@ export class WebHandler {
   }
 
   private crearteLambda(): NodejsFunction {
-    const funcName = `${this.prefix}-inque`
+    const funcName = `${this.prefix}-lambda`
     const entry = path.join(process.cwd(), "lambda", "lambda.ts")
 
     return new NodejsFunction(this.construct, funcName, {
       entry,
       functionName: funcName,
       runtime: Runtime.NODEJS_20_X,
-      timeout: Duration.seconds(10),
+      timeout: Duration.minutes(1),
       memorySize: 2056,
       environment: {
         SLACK_BOT_TOKEN_PARAM: this.commonParams.slackBotToken,
