@@ -15,7 +15,6 @@ export const singi = async (
   client: BedrockRuntime,
   messages: Message[]
 ): Promise<string> => {
-  console.log(JSON.stringify(messages))
   const res = await client.invokeModel({
     modelId: "anthropic.claude-3-sonnet-20240229-v1:0",
     body: JSON.stringify({
@@ -31,7 +30,6 @@ export const singi = async (
 
   const body = Buffer.from(res.body).toString("utf-8")
   const bodyObj = JSON.parse(body)
-  console.log(bodyObj)
   return bodyObj.content[0].text
 }
 
